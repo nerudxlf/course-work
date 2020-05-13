@@ -5,7 +5,7 @@
 #define INF INFINITE
 
 
-short int NUMBER_OF_PIECES_OF_CAKE = 17;
+short int NUMBER_OF_PIECES_OF_CAKE = 19;
 
 HANDLE hMutex, 
     hSPrintThink, 
@@ -21,7 +21,7 @@ HANDLE hMutex,
 const char arrTable[14][30] = {
     " ___________________________ ",
     "/                           \\",
-    "|                           |",
+    "|        This is a pie      |",
     "|                           |",
     "|                           |",
     "|                           |",
@@ -42,7 +42,7 @@ const char arr[7][15] = {
         "|             |",
         "|             |",
         "|             |",
-        "|             |",
+        "| pieces left |",
         "|             |",
         "|_____________|"
     };
@@ -76,20 +76,21 @@ void printTable(){
     }
 }
 
-void editNum(){
+void editNum(int arg){
     WaitForSingleObject(hMutexNum, INF);
-    NUMBER_OF_PIECES_OF_CAKE--;
+    if(arg==0) NUMBER_OF_PIECES_OF_CAKE--;
+    else NUMBER_OF_PIECES_OF_CAKE=20;
     ReleaseMutex(hMutexNum);
 }
 
 void thing(int id){
     WaitForSingleObject(hSPrintThink, INF);
     if(id==1){
-        GoToXY(40, 5);//верхний
+        GoToXY(40, 7);//верхний
         printf("(~.~)");
     }
     else if(id==2){
-        GoToXY(15, 15);//левый
+        GoToXY(18, 15);//левый
         printf("(~.~)");
     }
     else if(id==3){
@@ -97,11 +98,11 @@ void thing(int id){
         printf("(~.~)");
     }
     else if(id==4){
-        GoToXY(65, 15);//правый
+        GoToXY(62, 15);//правый
         printf("(~.~)");
     }
     ReleaseSemaphore(hSPrintThink, 1, NULL);
-    Sleep(TIME*id/2);
+    Sleep(TIME*id/3);
 }
 
 void knife(int id){
@@ -113,11 +114,11 @@ void knife(int id){
 void eating(int id){
     WaitForSingleObject(hSPrintEat, INF);
     if(id==1){
-        GoToXY(40, 5);
+        GoToXY(40, 7);
         printf("(^O^)");
     }
     else if(id==2){
-        GoToXY(15, 15);
+        GoToXY(18, 15);
         printf("(^O^)");
     }
     else if(id==3){
@@ -125,7 +126,7 @@ void eating(int id){
         printf("(^O^)");
     }
     else if(id==4){
-        GoToXY(65, 15);
+        GoToXY(62, 15);
         printf("(^O^)");
     }
     ReleaseSemaphore(hSPrintEat, 1, NULL);
@@ -135,30 +136,69 @@ void eating(int id){
 
 void dining(void* lpHDining){
     DWORD id = (int)lpHDining;
-    while(NUMBER_OF_PIECES_OF_CAKE>=0){
+    while(NUMBER_OF_PIECES_OF_CAKE>1){
         thing(id);
         knife(id);
-
         WaitForSingleObject(sPrintPie, INF);
         GoToXY(40, 15);
-        if(NUMBER_OF_PIECES_OF_CAKE+2>9) printf("%d", NUMBER_OF_PIECES_OF_CAKE+2);
-        else printf(" %d", NUMBER_OF_PIECES_OF_CAKE+2);
-        editNum();
+        if(NUMBER_OF_PIECES_OF_CAKE>9) printf("%d", NUMBER_OF_PIECES_OF_CAKE);
+        else printf(" %d", NUMBER_OF_PIECES_OF_CAKE);
+        editNum(0);
         ReleaseSemaphore(sPrintPie, 1, NULL);
-
         eating(id);
     }
     thing(id);
     WaitForSingleObject(sPrintPie, INF);
     GoToXY(40, 15);
-    //printf(" %d", NUMBER_OF_PIECES_OF_CAKE+2);
     ReleaseSemaphore(sPrintPie, 1, NULL);
+    ExitThread(0);
+}
+
+void displayMouseClick(HANDLE hStdout, int x, int y){
+    char value = 0;
+    COORD pos;
+    DWORD len;
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+    pos.X = x;
+    pos.Y = y;
+    ReadConsoleOutputCharacter(hStdout, &value, 1, pos, &len);
+    if((x>=34 && x<=48) && (y>=12 && y<= 18)){
+        editNum(1);
+    }
+}
+
+void startMouse(void* lpHDining){
+    INPUT_RECORD inbuf;
+    COORD coord;
+    DWORD len;
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+    DWORD fdwMode;
+    HANDLE hStdin = GetStdHandle(STD_INPUT_HANDLE),
+        hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
+    fdwMode = ENABLE_EXTENDED_FLAGS;
+    SetConsoleMode(hStdin, fdwMode);
+    fdwMode = ENABLE_MOUSE_INPUT;
+    if (!SetConsoleMode(hStdin, fdwMode)) printf("Failed to set console mode\n");
+    GetConsoleScreenBufferInfo(hStdout, &csbi);
+    while(1){
+        ReadConsoleInput(hStdin, &inbuf, 1, &len);
+        if(inbuf.EventType == MOUSE_EVENT){
+            if(inbuf.Event.MouseEvent.dwButtonState==FROM_LEFT_1ST_BUTTON_PRESSED){
+                displayMouseClick(hStdout,
+                    inbuf.Event.MouseEvent.dwMousePosition.X,
+                    inbuf.Event.MouseEvent.dwMousePosition.Y);
+            }
+        }
+    }
+    CloseHandle(hStdin);
+    CloseHandle(hStdout);
     ExitThread(0);
 }
 
 int main(){
     system("cls");
     HANDLE hPeopleDining[NUMBER_OF_MAN];
+    HANDLE hMouseClick;
     register short int i;
     hMutex = CreateMutex(NULL, FALSE, NULL);
     hSPrintEat = CreateSemaphore(NULL, 1, 1, NULL);
@@ -190,14 +230,20 @@ int main(){
     for(i=0;i<NUMBER_OF_MAN;i++){
         hPeopleDining[i] = (HANDLE) _beginthreadex(NULL, 4096, &dining, (void*)(i+1), 0, NULL);
         if(NULL == hPeopleDining[i]){
-            printf("Error Thread:%d\n", hPeopleDining[i]);
+           printf("Error Thread:%d\n", hPeopleDining[i]);
             return 0;
         }
+    }
+    hMouseClick = (HANDLE) _beginthreadex(NULL, 8192, &startMouse, (void*)1, 0, NULL);
+    if(NULL == hMouseClick){
+        printf("Error Thread:%d\n", hMouseClick);
+        return 0;
     }
     WaitForMultipleObjects(NUMBER_OF_MAN, hPeopleDining, TRUE, INF);
     for(i=0; i<NUMBER_OF_MAN;i++){
         CloseHandle(hPeopleDining[i]);
     }
+    CloseHandle(hMouseClick);
     CloseHandle(hSPrintEat);
     CloseHandle(hSPrintThink);
     CloseHandle(hMutexNum);
