@@ -6,6 +6,7 @@
 
 
 short int NUMBER_OF_PIECES_OF_CAKE = 19;
+short int STOP_INT = 0;
 
 HANDLE hMutex, 
     hSPrintThink, 
@@ -133,6 +134,12 @@ void eating(int id){
     Sleep(TIME*id/3);
 } 
 
+void stop(int id){
+    while(TRUE){
+        scanf("%d", &STOP_INT);
+        if(STOP_INT)
+    }
+}
 
 void dining(void* lpHDining){
     DWORD id = (int)lpHDining;
@@ -200,6 +207,7 @@ int main(){
     HANDLE hPeopleDining[NUMBER_OF_MAN];
     HANDLE hMouseClick;
     register short int i;
+    printf("(^O^) - he is eating    (~.~) - he is thinking");
     hMutex = CreateMutex(NULL, FALSE, NULL);
     hSPrintEat = CreateSemaphore(NULL, 1, 1, NULL);
     hSPrintThink = CreateSemaphore(NULL, 1, 1, NULL);
